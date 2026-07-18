@@ -1,0 +1,51 @@
+## --- Node.js ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json.bak
+.npm/
+.eslintcache
+
+## --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+*.egg
+.pytest_cache/
+.mypy_cache/
+
+## --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+## --- Database ---
+*.sqlite3
+*.db
+data/
+
+## --- Docker ---
+*.log
+
+## --- Terraform (added later, but useful now) ---
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+## --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
