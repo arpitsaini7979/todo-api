@@ -1,6 +1,7 @@
 import os
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
+from prometheus_flask_exporter import PrometheusMetrics
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
@@ -9,6 +10,10 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+
+# Exposes a /metrics endpoint with request counts/latencies and process
+# stats (including process_start_time_seconds, used for the uptime panel).
+metrics = PrometheusMetrics(app)
 
 
 class Todo(db.Model):

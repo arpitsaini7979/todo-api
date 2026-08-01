@@ -12,6 +12,9 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - default
+      - todo-net
 
   db:
     image: postgres:16-alpine
@@ -28,6 +31,12 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - default
 
 volumes:
   pgdata:
+
+networks:
+  todo-net:
+    external: true
