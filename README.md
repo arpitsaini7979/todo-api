@@ -2,11 +2,10 @@
 
 ## Overview
 A simple To-Do list REST API built as a hands-on DevOps learning project. It covers the full
-lifecycle from local development to a containerized, cloud-deployed service with CI/CD —
-built step by step to learn Docker, Terraform, GitHub Actions, and AWS.
+lifecycle from local development to a containerized, cloud-deployed, monitored service —
+built step by step to learn Docker, Terraform, GitHub Actions, AWS, and Prometheus/Grafana.
 
-**Status:** ✅ Deployed and live on AWS EC2, with a working CI/CD pipeline. Monitoring
-(Prometheus + Grafana) not yet added.
+**Status:** ✅ Deployed and live on AWS EC2, with a working CI/CD pipeline and monitoring.
 
 ## Tech Stack
 - **Language/Framework:** Python 3.11 + Flask, served by Gunicorn
@@ -14,7 +13,7 @@ built step by step to learn Docker, Terraform, GitHub Actions, and AWS.
 - **Containerization:** Docker + Docker Compose
 - **Infrastructure:** Terraform (AWS EC2, t2.micro), remote state in S3
 - **CI/CD:** GitHub Actions (test → build & push to Docker Hub → deploy over SSH)
-- **Monitoring:** Prometheus + Grafana (planned — not yet implemented)
+- **Monitoring:** Prometheus (metrics collection) + Grafana (dashboards), node-exporter for host metrics
 
 ## Architecture
 ```
@@ -30,8 +29,13 @@ GitHub Actions
    v
 AWS EC2 (Terraform-provisioned, t2.micro)
    |
-   |-- Container: todo-api (Flask + Gunicorn, port 3000)
-   |-- Container: todo-db  (PostgreSQL 16)
+   |-- Container: todo-api      (Flask + Gunicorn, port 3000, exposes /metrics)
+   |-- Container: todo-db       (PostgreSQL 16)
+   |-- Container: node-exporter (host CPU/memory metrics, port 9100 internal)
+   |-- Container: prometheus    (scrapes todo-api + node-exporter, port 9090)
+   |-- Container: grafana       (dashboards, port 3001)
+   |
+   (todo-api and the monitoring containers share a Docker network, "todo-net")
 ```
 
 Terraform state is stored remotely in an S3 bucket (`todo-api-terraform-state-arpitsaini7979`)
@@ -41,6 +45,7 @@ with versioning enabled, instead of a local `.tfstate` file.
 | Method | Endpoint       | Description             |
 |--------|----------------|--------------------------|
 | GET    | `/health`      | Health check             |
+| GET    | `/metrics`     | Prometheus metrics       |
 | GET    | `/todos`       | List all to-dos          |
 | POST   | `/todos`       | Create a to-do           |
 | GET    | `/todos/:id`   | Get a single to-do       |
@@ -89,7 +94,8 @@ terraform plan -var="key_pair_name=<your-ec2-key-pair-name>"
 terraform apply -var="key_pair_name=<your-ec2-key-pair-name>"
 ```
 This provisions one EC2 `t2.micro` instance with a security group allowing SSH (22),
-HTTP (80), and the API port (3000), and installs Docker + the Compose plugin on first boot.
+HTTP (80), the API port (3000), Grafana (3001), and Prometheus (9090), and installs
+Docker + the Compose plugin on first boot.
 
 ### CI/CD
 On every push to `main`, `.github/workflows/ci.yml`:
@@ -101,9 +107,32 @@ On every push to `main`, `.github/workflows/ci.yml`:
 Required GitHub repository secrets: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`,
 `EC2_USER`, `EC2_SSH_KEY`.
 
+### Monitoring (Prometheus + Grafana)
+One-time setup on the EC2 host (needed so the monitoring stack can reach `todo-api` by name):
+```bash
+docker network create todo-net
+```
+Then, from the `monitoring/` folder on the server:
+```bash
+docker compose -f docker-compose.monitoring.yml up -d
+```
+- Prometheus scrapes `todo-api:3000/metrics` and `node-exporter:9100` every 15s
+  (config in `monitoring/prometheus.yml`).
+- Grafana auto-provisions a Prometheus data source and a "To-Do API Server Overview"
+  dashboard (CPU usage, memory usage, app uptime) on first startup — no manual setup needed.
+- Default Grafana login is `admin` / `admin` — change it on first login.
+
+## Live URLs
+| What | URL |
+|---|---|
+| To-Do API | http://3.87.7.242:3000/todos |
+| Health check | http://3.87.7.242:3000/health |
+| Prometheus | http://3.87.7.242:9090 |
+| Grafana | http://3.87.7.242:3001 |
+
 ## Project Roadmap
 - [x] Phase 1: To-Do API + database
 - [x] Phase 2: Dockerize
 - [x] Phase 3: CI/CD with GitHub Actions
 - [x] Phase 4: Terraform (AWS EC2) + Deploy
-- [ ] Phase 5: Monitoring with Prometheus + Grafana
+- [x] Phase 5: Monitoring with Prometheus + Grafana
