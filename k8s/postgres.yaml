@@ -1,0 +1,72 @@
+# Postgres for the k8s lab. The password comes from a Secret created out-of-band
+# (never committed):
+#   kubectl create secret generic todo-db-auth \
+#     --from-literal=POSTGRES_PASSWORD='<password>'
+# Use the same password in the todo-api-db secret (see deployment.yaml).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: todo-db
+  labels:
+    app: todo-db
+spec:
+  serviceName: todo-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: todo-db
+  template:
+    metadata:
+      labels:
+        app: todo-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: todo_user
+            - name: POSTGRES_DB
+              value: todo_db
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: todo-db-auth
+                  key: POSTGRES_PASSWORD
+            # Data goes in a subdirectory: the volume root contains lost+found,
+            # which makes initdb refuse to start.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "todo_user", "-d", "todo_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  # Each replica gets its own PersistentVolumeClaim; k3s provisions it with the
+  # built-in local-path storage class.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+# ClusterIP Service: gives the API a stable name, "todo-db", matching the host
+# in DATABASE_URL. Not exposed outside the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-db
+spec:
+  selector:
+    app: todo-db
+  ports:
+    - port: 5432
+      targetPort: 5432
