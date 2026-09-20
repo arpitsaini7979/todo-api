@@ -5,7 +5,8 @@ metadata:
   labels:
     app: todo-api
 spec:
-  replicas: 2
+  # No "replicas" here on purpose: the HorizontalPodAutoscaler (hpa.yaml) owns
+  # the pod count. Setting it here would make ArgoCD's selfHeal fight the HPA.
   selector:
     matchLabels:
       app: todo-api
@@ -29,6 +30,14 @@ spec:
                 secretKeyRef:
                   name: todo-api-db
                   key: DATABASE_URL
+          # HPA measures CPU as a percentage of "requests", so this is required.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           readinessProbe:
             httpGet:
               path: /health
