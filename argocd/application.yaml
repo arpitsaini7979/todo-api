@@ -1,0 +1,23 @@
+# Tells ArgoCD: "keep the cluster identical to the manifests in git".
+# Kept OUTSIDE k8s/ on purpose, so ArgoCD does not try to manage itself.
+# Apply once by hand: kubectl apply -f argocd/application.yaml
+# The DB Secrets (todo-db-auth, todo-api-db) are NOT in git; they already exist
+# in the cluster, and ArgoCD only prunes what it created from git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: todo-api
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/arpitsaini7979/todo-api.git
+    targetRevision: feature/k8s-gitops
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true     # delete cluster resources that were removed from git
+      selfHeal: true  # revert manual kubectl edits back to what git says

@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-api
+  labels:
+    app: todo-api
+spec:
+  # No "replicas" here on purpose: the HorizontalPodAutoscaler (hpa.yaml) owns
+  # the pod count. Setting it here would make ArgoCD's selfHeal fight the HPA.
+  selector:
+    matchLabels:
+      app: todo-api
+  template:
+    metadata:
+      labels:
+        app: todo-api
+    spec:
+      containers:
+        - name: todo-api
+          # Deploy an immutable tag (the CI pushes one per commit SHA), not :latest.
+          image: arpitsaini/todo-api:6921e693ac63f07af36dcd184474ce7c6808a85c
+          ports:
+            - containerPort: 3000
+          env:
+            # Create the secret out-of-band; do not commit it:
+            #   kubectl create secret generic todo-api-db \
+            #     --from-literal=DATABASE_URL='postgresql://todo_user:<password>@todo-db:5432/todo_db'
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: todo-api-db
+                  key: DATABASE_URL
+          # HPA measures CPU as a percentage of "requests", so this is required.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 20
