@@ -62,7 +62,9 @@ data "aws_ami" "amazon_linux" {
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    # "2023.*" on purpose: plain "al2023-ami-*" also matches the -minimal- images,
+    # which come with a 2 GB root disk and ran out of space pulling the app image.
+    values = ["al2023-ami-2023.*-x86_64"]
   }
 
   filter {
@@ -117,6 +119,13 @@ resource "aws_instance" "todo_api" {
     http_endpoint               = "enabled"
     http_tokens                 = "required" # IMDSv2 only
     http_put_response_hop_limit = 1          # containers can't reach the metadata service
+  }
+
+  # Set the root disk size explicitly instead of inheriting the AMI's default.
+  # Docker images, the Postgres data and Prometheus/Grafana all live here.
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
   }
 
   # Installs Docker and the Compose plugin on first boot, so the CI
