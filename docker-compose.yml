@@ -1,4 +1,6 @@
-version: "3.9"
+# Local development only. The credentials below are throwaway defaults for a
+# database that is bound to localhost; production reads its password from .env
+# (see docker-compose.prod.yml).
 
 services:
   api:
@@ -7,7 +9,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://todo_user:todo_pass@db:5432/todo_db
+      DATABASE_URL: postgresql://todo_user:${POSTGRES_PASSWORD:-todo_pass}@db:5432/todo_db
     depends_on:
       db:
         condition: service_healthy
@@ -18,10 +20,10 @@ services:
     container_name: todo-db
     environment:
       POSTGRES_USER: todo_user
-      POSTGRES_PASSWORD: todo_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo_pass}
       POSTGRES_DB: todo_db
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
