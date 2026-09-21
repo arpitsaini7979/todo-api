@@ -1,49 +1,62 @@
-version: "3.9"
+# Versions and the Grafana password come from monitoring/.env on the server
+# (see monitoring/.env.example). Grafana and Prometheus are bound to localhost
+# only; reach them through an SSH tunnel.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:${NODE_EXPORTER_VERSION:?set NODE_EXPORTER_VERSION in monitoring/.env}
     container_name: node-exporter
     restart: unless-stopped
     pid: host
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /:/rootfs:ro
     command:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
       - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    logging: *default-logging
     networks:
       - todo-net
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:${PROMETHEUS_VERSION:?set PROMETHEUS_VERSION in monitoring/.env}
     container_name: prometheus
     restart: unless-stopped
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     depends_on:
       - node-exporter
+    logging: *default-logging
     networks:
       - todo-net
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:${GRAFANA_VERSION:?set GRAFANA_VERSION in monitoring/.env}
     container_name: grafana
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      # Only applied when the grafana_data volume is first created. On an
+      # existing volume, reset it with:
+      #   docker exec -it grafana grafana cli admin reset-admin-password <new>
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in monitoring/.env}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
+    logging: *default-logging
     networks:
       - todo-net
 
